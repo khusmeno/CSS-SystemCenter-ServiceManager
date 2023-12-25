@@ -818,7 +818,32 @@ $script:SQLResultSetCounter = $null
 AddTimingsToStatInfo
 (GetStatInfoRoot).SetAttribute("SmdtResultZipName", [System.IO.Path]::GetFileName($resultingZipFile_FullPath).Replace( $inputPrefix, $inputPrefix + "_" + $script:RoleFoundAbbr ) )
 (GetStatInfoRoot).SetAttribute("SmdtRanAsSigned", (AmIRunningAsSigned) )
-(GetStatInfoRoot).SetAttribute("SmdtRunDomainHash", (GetHashOfString ($env:USERDNSDOMAIN.ToLower()) ) )
+(GetStatInfoRoot).SetAttribute("SmdtRunDomainHash", (GetHashOfString ([System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name.ToLower()) ) )
+
+$HealthStatusClass = $null
+
+if ((IsSourceScsmWfMgmtServer)) {
+    $HealthStatusClassName = 'MicrosoftSupport.SCSM.HealthStatus'
+    $TargetMS = "localhost"
+}
+elseif ((IsSourceScsmDwMgmtServer)) {
+    $HealthStatusClassName = 'MicrosoftSupport.SCSM.HealthStatus.DW'
+    $TargetMS = $SMDBInfo.SDKServer_SMDB
+}
+
+$HealthStatusClass = Get-SCSMClass -Name $HealthStatusClassName -ComputerName $TargetMS
+if ($HealthStatusClass) {
+    $HealthStatus = Get-SCSMClassInstance -Class $HealthStatusClass -ComputerName $TargetMS
+
+    [int]$HealthStatus.CriticalCount     = $findings.SelectSingleNode([ProblemSeverity]::Critical).GetAttribute("Count")
+    [int]$HealthStatus.ErrorCount        = $findings.SelectSingleNode([ProblemSeverity]::Error).GetAttribute("Count")
+    [int]$HealthStatus.WarningCount      = $findings.SelectSingleNode([ProblemSeverity]::Warning).GetAttribute("Count")
+    [int]$HealthStatus.UnclassifiedCount = $findings.SelectSingleNode([ProblemSeverity]::Unclassified).GetAttribute("Count")
+    $HealthStatus.ResultingZipFileLocation = $resultingZipFile_FullPath.Replace( $inputPrefix, $inputPrefix + "_" + $script:RoleFoundAbbr )
+    [int]$HealthStatus.TotalProblems = $HealthStatus.CriticalCount + $HealthStatus.ErrorCount + $HealthStatus.WarningCount + $HealthStatus.UnclassifiedCount
+
+    $HealthStatus | Update-SCSMClassInstance
+}
 
 Stop-Transcript | out-null
 

@@ -19,6 +19,10 @@
         if ($hWnd -ne 0) {
             $win32::ShowWindow($hWnd, $SW_HIDE)
         }
+
+        Start-Sleep -Seconds 3;
+        Remove-Item -Path [System.IO.Path]::Combine($env:TEMP, $win32.Assembly.GetName().Name) -Force
+
         $p.WaitForExit()
 
     } -InputObject  "/report ""$((GetFileNameInTargetFolder "msinfo32.txt"))""" | Out-Null
